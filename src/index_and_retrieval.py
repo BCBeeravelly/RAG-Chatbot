@@ -153,27 +153,27 @@ class IndexRetriever:
         self.vector_store = vector_store
         return vector_store
     
-    def build_docstore(self, split_docs: List[Document]) -> InMemoryStore:
-        """
-        Builds an InMemoryStore for parent document retrieval.
-        """
-        print('Building the document store...')
-        docstore = InMemoryStore()
-        self.docstore = docstore
-        return docstore
+    # def build_docstore(self, split_docs: List[Document]) -> InMemoryStore:
+    #     """
+    #     Builds an InMemoryStore for parent document retrieval.
+    #     """
+    #     print('Building the document store...')
+    #     docstore = InMemoryStore()
+    #     self.docstore = docstore
+    #     return docstore
     
     def build_parent_retriever(self, docstore: InMemoryStore) -> ParentDocumentRetriever:
         """
         Builds a ParentDocumentRetriever using the provided document store.
         """
         print('Building the parent retriever...')
-        parent_retriever = ParentDocumentRetriever(
+        self.parent_retriever = ParentDocumentRetriever(
             vectorstore=self.vector_store,
-            docstore=self.docstore,
+            docstore=InMemoryStore(),
             child_splitter=self.child_splitter
         )
-        self.parent_retriever = parent_retriever
-        return parent_retriever
+        
+        
 
     def add_documents(self):
         """
@@ -195,15 +195,16 @@ class IndexRetriever:
         results = self.vector_store.similarity_search_with_score(query, k=k)
         # Use the parent retriever's invoke operation to get the parent document.
         parent_document = self.parent_retriever.invoke(query)
+        print(f'Parent document retrieved: {parent_document}')
         return results, parent_document
     
-    # Add this to the IndexRetriever class
+
     def setup_for_retrieval(self):
         """Run setup steps (load data, build index, etc.) without a query."""
         self.load_data()
         self.split_documents(self.documents)
         self.build_index()
-        self.build_docstore(self.split_docs)
+        # self.build_docstore(self.split_docs)
         self.build_parent_retriever(self.docstore)
         self.add_documents()
 
@@ -219,8 +220,8 @@ class IndexRetriever:
         self.split_documents(self.documents)
         # 3. Build or load the vector store index (persistent via Qdrant)
         self.build_index()
-        # 4. Build the document store for parent retrieval
-        self.build_docstore(self.split_docs)
+        # # 4. Build the document store for parent retrieval
+        # self.build_docstore(self.split_docs)
         # 5. Build the parent retriever
         self.build_parent_retriever(self.docstore)
         # 6. Add the child chunks to the vector store via the retriever mechanism
