@@ -48,7 +48,7 @@ class LLMAnsweringAgent:
         # Initialize the retriever
         self.retriever = IndexRetriever(
             embeddings=self.voyage_embeddings,
-            data_dir=DATA_DIR,
+            data_dir=SAMPLE_DATA_DIR,
             qdrant_dir=QDRANT_DIR,
             child_splitter=RecursiveCharacterTextSplitter(chunk_size = 600, separators=['\n']),
             scrape_flag=False,
@@ -72,32 +72,6 @@ class LLMAnsweringAgent:
         
         return child_docs, parent_docs
     
-    def generate_answer(self, user_query, child_docs, parent_docs):
-        """
-        Generate an answer to the user's question using the LLM.
-        """
-        # Create a prompt for the LLM
-        prompt = f"""
-        You are an expert in US executive orders. Your task is to answer questions based on the information provided in the executive orders. 
-        If the information is not available in the provided documents, respond with "I don't know".
-
-        Question: {user_query}
-
-        Context:
-        """
-        
-        # Add context from child documents
-        for doc in child_docs:
-            prompt += f"\n\n{doc.page_content}\n\n"
-        
-        # Add context from parent documents
-        for doc in parent_docs:
-            prompt += f"\n\n{doc.page_content}\n\n"
-        
-        # Generate an answer using the LLM
-        response = self.llm([SystemMessage(content=prompt)])
-        
-        return response.content.strip()
         
 if __name__ == "__main__":
     agent = LLMAnsweringAgent()
