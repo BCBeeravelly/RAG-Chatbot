@@ -141,7 +141,7 @@ class IndexRetriever:
                 print(f'No existing collection to delete: {e}')
             
             # Set vector parameters (make sure size matches your embedding dimension)
-            # (For example, if using a 1024-dimensional embedding)
+            
             vector_params = VectorParams(size=1024, distance=Distance.COSINE)
             client.create_collection(collection_name=collection_name, vectors_config=vector_params)
         else:

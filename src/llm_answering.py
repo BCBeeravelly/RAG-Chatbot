@@ -52,7 +52,7 @@ class LLMAnsweringAgent:
             qdrant_dir=QDRANT_DIR,
             child_splitter=RecursiveCharacterTextSplitter(chunk_size = 600, separators=['\n']),
             scrape_flag=False,
-            build_vector_flag=False
+            build_vector_flag=True
         )
         
         self.retriever.setup_for_retrieval()
