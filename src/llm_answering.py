@@ -27,6 +27,7 @@ from typing import Dict, List, Tuple
 CURRENT_DIR = os.getcwd()
 BASE_DIR = os.path.dirname(CURRENT_DIR)
 DATA_DIR  = os.path.join(BASE_DIR, 'data/raw')
+SAMPLE_DATA_DIR = os.path.join(BASE_DIR, 'data/sample')
 VECTOR_DIR = os.path.join(BASE_DIR, 'data/vectors')
 QDRANT_DIR = os.path.join(BASE_DIR, 'data/qdrant')
 

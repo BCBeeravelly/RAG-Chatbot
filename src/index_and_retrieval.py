@@ -22,6 +22,7 @@ from langchain_core.documents import Document
 CURRENT_DIR = os.getcwd()
 BASE_DIR = os.path.dirname(CURRENT_DIR)
 DATA_DIR  = os.path.join(BASE_DIR, 'data/raw')
+SAMPLE_DATA_DIR = os.path.join(BASE_DIR, 'data/sample')
 VECTOR_DIR = os.path.join(BASE_DIR, 'data/vectors')
 QDRANT_DIR = os.path.join(BASE_DIR, 'data/qdrant')
 
@@ -45,9 +46,11 @@ class IndexRetriever:
         self.embeddings = embeddings
         self.data_dir = data_dir
         self.qdrant_dir = qdrant_dir
+        self.child_splitter = child_splitter
+        
+        # Setting the flags
         self.scrape_flag = scrape_flag
         self.build_vector_flag = build_vector_flag
-        self.child_splitter = child_splitter
         
         
         # These attributes will be set later in the pipeline
@@ -243,11 +246,11 @@ if __name__ == "__main__":
     # Instantiate the combined class
     index_retriever = IndexRetriever(
         embeddings=voyage_embeddings,
-        data_dir=DATA_DIR,
+        data_dir=SAMPLE_DATA_DIR,
         qdrant_dir=QDRANT_DIR,
         child_splitter=RecursiveCharacterTextSplitter(chunk_size=600, separators=['\n']),
         scrape_flag=False,       # Set True to scrape; False to load from DATA_DIR
-        build_vector_flag=False  # Set True to rebuild the vector store; False to load existing
+        build_vector_flag=True  # Set True to rebuild the vector store; False to load existing
     )
     
     # Run the full pipeline to perform retrieval
