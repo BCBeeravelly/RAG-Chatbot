@@ -1,0 +1,3 @@
+# Environment files
+.env
+# data/qdrant/collection/Executive-Orders/storage.sqlite
