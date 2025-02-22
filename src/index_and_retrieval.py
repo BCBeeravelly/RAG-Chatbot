@@ -198,7 +198,6 @@ class IndexRetriever:
         results = self.vector_store.similarity_search_with_score(query, k=k)
         # Use the parent retriever's invoke operation to get the parent document.
         parent_document = self.parent_retriever.invoke(query)
-        print(f'Parent document retrieved: {parent_document}')
         return results, parent_document
     
 

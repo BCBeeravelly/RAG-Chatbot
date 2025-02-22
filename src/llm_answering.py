@@ -11,6 +11,9 @@ from langchain_core.documents import Document
 
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables import RunnablePassthrough
+from langchain_core.output_parsers import StrOutputParser
 
 
 ## Utility packages
@@ -61,6 +64,57 @@ class LLMAnsweringAgent:
             model = llm_model,
             temperature = temperature
         )
+        
+        # Initialize the conversation memory
+        self.memory = []
+        
+        # Create the answer chain with memory
+        self.answer_chain = self._create_answer_chain()
+        
+    def _create_answer_chain(self):
+        """
+        Create a chain that uses the LLM to generate an answer to the user's question.
+        
+        """
+        
+        # System prompt template
+        
+        template = """
+                    You're an expert in analyzing executive orders. 
+        Use the following context to answer the question. If you don't know the answer, say so.
+        Use the conversation history to inform your answer.
+        
+        Context: {context}
+        Conversation history: {history}
+        Question: {question}    
+        Answer:
+        """
+        
+        prompt = ChatPromptTemplate.from_template(template)
+        
+        return (
+            {
+                "context": lambda x: self._format_context(x['question']),
+                "question": lambda x: x['question'],
+                "history": lambda x: x['history']
+            }
+            | prompt
+            | self.llm
+            | StrOutputParser()
+        )
+        
+    def _format_context(self, question):
+        """
+        Retrieve and format context for the LLM.
+        """
+        child_docs, parent_docs = self.retrieve_documents(question)
+        
+        return "\n\n".join([
+            "PARENT DOCUMENTS:",
+            "\n---\n".join(d[0].page_content for d in parent_docs),
+            "\nCHILD DOCUMENTS:",
+            "\n---\n".join(d.page_content for d in child_docs)
+        ])
     
     def retrieve_documents(self, user_query):
         """
@@ -72,12 +126,22 @@ class LLMAnsweringAgent:
         
         return child_docs, parent_docs
     
+    
         
 if __name__ == "__main__":
     agent = LLMAnsweringAgent()
-    user_query = "Is there a hiring freeze?"
-    child_docs, parent_docs = agent.retrieve_documents(user_query)
-    print(f"Number of child documents: {len(child_docs)}")
-    print(f"Number of parent documents: {len(parent_docs)}")
-    print(f"Child docs: {child_docs}")
-    print(f"Parent docs: {parent_docs[0].page_content}")
+    
+    # questions = [
+    #     "Is there a hiring freeze?"
+    # ]
+    
+    # for q in questions:
+    #     print(f"\nUser: {q}")
+    #     response = agent.answer_question(q)
+    #     print(f"Assistant: {response}")
+    #     print("---" * 20)
+    question = "Is there a hiring freeze?"
+    child_docs, parent_docs = agent.retrieve_documents(question)
+    print(parent_docs)
+    print('---' * 20)
+    print(child_docs)    
