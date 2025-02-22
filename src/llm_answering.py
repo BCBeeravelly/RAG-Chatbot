@@ -65,56 +65,7 @@ class LLMAnsweringAgent:
             temperature = temperature
         )
         
-        # Initialize the conversation memory
-        self.memory = []
         
-        # Create the answer chain with memory
-        self.answer_chain = self._create_answer_chain()
-        
-    def _create_answer_chain(self):
-        """
-        Create a chain that uses the LLM to generate an answer to the user's question.
-        
-        """
-        
-        # System prompt template
-        
-        template = """
-                    You're an expert in analyzing executive orders. 
-        Use the following context to answer the question. If you don't know the answer, say so.
-        Use the conversation history to inform your answer.
-        
-        Context: {context}
-        Conversation history: {history}
-        Question: {question}    
-        Answer:
-        """
-        
-        prompt = ChatPromptTemplate.from_template(template)
-        
-        return (
-            {
-                "context": lambda x: self._format_context(x['question']),
-                "question": lambda x: x['question'],
-                "history": lambda x: x['history']
-            }
-            | prompt
-            | self.llm
-            | StrOutputParser()
-        )
-        
-    def _format_context(self, question):
-        """
-        Retrieve and format context for the LLM.
-        """
-        child_docs, parent_docs = self.retrieve_documents(question)
-        
-        return "\n\n".join([
-            "PARENT DOCUMENTS:",
-            "\n---\n".join(d[0].page_content for d in parent_docs),
-            "\nCHILD DOCUMENTS:",
-            "\n---\n".join(d.page_content for d in child_docs)
-        ])
     
     def retrieve_documents(self, user_query):
         """
