@@ -10,12 +10,12 @@ from langchain.retrievers import ParentDocumentRetriever
 from langchain_core.documents import Document
 
 from langchain_openai import ChatOpenAI
-from langchain_core.messages import SystemMessage, HumanMessage
-from langchain.agents import AgentExecutor
-from langchain.agents.format_scratchpad import format_log_to_str
-from langchain.agents.output_parsers import ReActSingleInputOutputParser
+from langchain_core.messages import AIMessage, HumanMessage
+from langchain.memory import ConversationBufferMemory
+from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import PromptTemplate
 from langchain_core.runnables import RunnablePassthrough
+
 
 
 ## Utility packages
@@ -73,6 +73,13 @@ class AnsweringAgent:
         )
         self.child_docs = None
         self.parent_docs = None
+        
+        # Add conversation memory
+        self.memory = ConversationBufferMemory(
+            memory_key="chat_history",
+            return_messages=True,
+            input_key="question"
+        )
               
     
     def retrieve_documents(self, user_query):
@@ -83,62 +90,65 @@ class AnsweringAgent:
         self.user_query = user_query
         print(f"Retrieving documents for query: {self.user_query}")
         self.child_docs, self.parent_docs = self.retriever.retrieve(self.user_query)
-        
         return self.child_docs, self.parent_docs
     
     def answering_agent(self):
-        '''
-        Answers the user's query using the retrieved documents.
-        '''
-
-        # Combine parent documents' content
-        context = "\n\n".join([doc.page_content for doc in self.parent_docs])
-
-        # ReAct prompt template
-        template = """Answer the question using ONLY this context. Think step-by-step.
-        If unsure, say you don't know. Use this format:
-
-        Question: {question}
-
-        Context: {context}
-
-        Thought: First, I need to...
-        Action: check_context
-        Action Input: [relevant part from question]
-        Observation: [context information]
-        ... (repeat Thought/Action/Observation as needed)
-        Final Answer: [concise answer]"""
-
+        '''Answers with conversation context'''
+        context = "\n\n".join([doc.page_content for doc in self.parent_docs]) if self.parent_docs else "No relevant documents found"
+        
+        # Create conversation-aware prompt
+        template = """You're an assistant for executive order questions. Use:
+        - Chat history: {chat_history}
+        - Context: {context}
+        
+        Current Question: {question}
+        
+        If needed, ask follow-up questions. Be helpful and precise. Say "I don't know" if unsure."""
+        
         prompt = PromptTemplate.from_template(template)
         
-        # Set up agent pipeline (without actual tools)
-        agent = (
+        # Build conversation chain
+        conversation_chain = (
             RunnablePassthrough.assign(
-                context=lambda x: context,
-                question=lambda x: x["question"]
+                context=lambda _: context,
+                chat_history=lambda x: self.memory.load_memory_variables(x)["chat_history"]
             )
             | prompt
             | self.llm
-            | ReActSingleInputOutputParser()
+            | StrOutputParser()
         )
-
-        # Execute agent
-        agent_executor = AgentExecutor(
-            agent=agent, 
-            tools=[],  # Will add tools later
-            verbose=True,
-            handle_parsing_errors=True
-        )
-
-        result = agent_executor.invoke({"question": self.user_query})
-        return result["output"]
+        
+        return conversation_chain.invoke({"question": self.user_query})
+    
+    def chat_loop(self):
+        """Run continuous chat interface"""
+        print("Executive Order Assistant. Type 'exit' to end.")
+        while True:
+            try:
+                question = input("\nYou: ")
+                if question.lower() in ['exit', 'quit']:
+                    break
+                
+                # Retrieve docs and generate answer
+                self.retrieve_documents(question)
+                answer = self.answering_agent()
+                
+                # Update memory
+                self.memory.save_context(
+                    {"question": question},
+                    {"answer": answer}
+                )
+                
+                print(f"\nAssistant: {answer}")
+                
+            except KeyboardInterrupt:
+                print("\nSession ended.")
+                break
     
     
         
+# Update the main block
 if __name__ == "__main__":
     agent = AnsweringAgent()
-    question = input("Enter your question: ")
-    agent.retrieve_documents(question)
-    answer = agent.answering_agent()
-    print(f"Answer: {answer}")
+    agent.chat_loop()
     

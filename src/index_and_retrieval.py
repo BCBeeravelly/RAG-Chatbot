@@ -204,7 +204,7 @@ class IndexRetriever:
     def setup_for_retrieval(self):
         """Run setup steps (load data, build index, etc.) without a query."""
         self.load_data()
-        self.split_documents(self.documents)
+        # self.split_documents(self.documents)
         self.build_index()
         # self.build_docstore(self.split_docs)
         self.build_parent_retriever(self.docstore)
