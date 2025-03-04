@@ -16,6 +16,9 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import PromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 
+from langchain.agents import Tool, AgentExecutor, create_tool_calling_agent
+from langchain_community.tools.tavily_search import TavilySearchResults
+
 
 
 ## Utility packages
@@ -80,6 +83,27 @@ class AnsweringAgent:
             return_messages=True,
             input_key="question"
         )
+        
+        # Web Search Tool
+        self.search_tool = TavilySearchResults(api_key=os.getenv('TAVILY_API_KEY'))
+        
+    def judge_web_search_needed(self, initial_answer, question):
+        """Determine if web search is needed using LLM-as-judge"""
+        judge_prompt = """Analyze if the answer sufficiently addresses the question. Consider:
+        - Uncertainty markers ('I don't know', 'not specified')
+        - Completeness
+        - Relevance to question
+        
+        Respond ONLY with 'yes' (needs search) or 'no'.
+        
+        Question: {question}
+        Initial Answer: {initial_answer}
+        Decision:"""
+        
+        prompt = PromptTemplate.from_template(judge_prompt)
+        chain = prompt | self.llm | StrOutputParser()
+        decision = chain.invoke({"question": question, "initial_answer": initial_answer})
+        return decision.strip().lower() == 'yes'
               
     
     def retrieve_documents(self, user_query):
@@ -92,23 +116,17 @@ class AnsweringAgent:
         self.child_docs, self.parent_docs = self.retriever.retrieve(self.user_query)
         return self.child_docs, self.parent_docs
     
-    def answering_agent(self):
-        '''Answers with conversation context'''
-        context = "\n\n".join([doc.page_content for doc in self.parent_docs]) if self.parent_docs else "No relevant documents found"
-        
-        # Create conversation-aware prompt
-        template = """You're an assistant for executive order questions. Use:
+    def generate_answer(self, context):
+        """Generate answer with given context"""
+        template = """Answer using:
         - Chat history: {chat_history}
         - Context: {context}
         
-        Current Question: {question}
-        
-        If needed, ask follow-up questions. Be helpful and precise. Say "I don't know" if unsure."""
+        Question: {question}
+        Helpful answer:"""
         
         prompt = PromptTemplate.from_template(template)
-        
-        # Build conversation chain
-        conversation_chain = (
+        chain = (
             RunnablePassthrough.assign(
                 context=lambda _: context,
                 chat_history=lambda x: self.memory.load_memory_variables(x)["chat_history"]
@@ -117,8 +135,28 @@ class AnsweringAgent:
             | self.llm
             | StrOutputParser()
         )
+        return chain.invoke({"question": self.user_query})
+    
+    def answering_agent(self):
+        """Enhanced answering with web search fallback"""
+        # Initial context from documents
+        doc_context = "\n\n".join([doc.page_content for doc in self.parent_docs]) if self.parent_docs else ""
         
-        return conversation_chain.invoke({"question": self.user_query})
+        # First-stage answer
+        initial_answer = self.generate_answer(doc_context)
+        
+        # Judge if search needed
+        if self.judge_web_search_needed(initial_answer, self.user_query):
+            print("\nPerforming web search...")
+            search_results = self.search_tool.invoke({"query": self.user_query, "max_results": 3})
+            web_context = "\n".join([f"Source {i+1}: {res.get('content', '')}" 
+                                  for i, res in enumerate(search_results)])
+            
+            # Combine contexts
+            full_context = f"Document Context:\n{doc_context}\n\nWeb Results:\n{web_context}"
+            return self.generate_answer(full_context)
+            
+        return initial_answer
     
     def chat_loop(self):
         """Run continuous chat interface"""
